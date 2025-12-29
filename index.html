@@ -1,596 +1,516 @@
-import React, { useState, useEffect } from ‘react’;
-import { Heart, Coffee, Zap, Home, Briefcase, Users, AlertCircle } from ‘lucide-react’;
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spoon Theory - Le Jeu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen">
+    <div id="app"></div>
 
-const SpoonTheoryGame = () => {
-// Game state
-const [gamePhase, setGamePhase] = useState(‘intro’); // intro, day, rest, gameOver
-const [spoons, setSpoons] = useState(12);
-const [maxSpoons, setMaxSpoons] = useState(12);
-const [neuralResources, setNeuralResources] = useState(0);
-const [day, setDay] = useState(1);
-const [deck, setDeck] = useState([]);
-const [hand, setHand] = useState([]);
-const [currentSituation, setCurrentSituation] = useState(null);
-const [situationIndex, setSituationIndex] = useState(0);
-const [message, setMessage] = useState(’’);
-const [profile, setProfile] = useState(null);
-const [socialClass, setSocialClass] = useState(null);
+    <script>
+        // État du jeu
+        let gameState = {
+            phase: 'intro',
+            spoons: 12,
+            maxSpoons: 12,
+            neuralResources: 0,
+            day: 1,
+            deck: [],
+            hand: [],
+            currentSituation: null,
+            situationIndex: 0,
+            message: '',
+            profile: null,
+            socialClass: null
+        };
 
-// Profils de neurodivergence
-const profiles = {
-tdah: {
-name: “TDAH”,
-description: “Hyperfocus puissant mais transitions difficiles”,
-startingSpoons: 10,
-specialMechanic: “Bonus aléatoires, pénalité aux transitions”
-},
-autisme: {
-name: “Autisme”,
-description: “Routines efficaces, imprévus coûteux”,
-startingSpoons: 12,
-specialMechanic: “Combos de routine, vulnérable aux changements”
-},
-migraine: {
-name: “Migraine Chronique”,
-description: “Sensible aux déclencheurs sensoriels”,
-startingSpoons: 8,
-specialMechanic: “Déclencheurs progressifs”
-}
-};
+        // Profils
+        const profiles = {
+            tdah: {
+                name: "TDAH",
+                description: "Hyperfocus puissant mais transitions difficiles",
+                startingSpoons: 10
+            },
+            autisme: {
+                name: "Autisme",
+                description: "Routines efficaces, imprévus coûteux",
+                startingSpoons: 12
+            },
+            migraine: {
+                name: "Migraine Chronique",
+                description: "Sensible aux déclencheurs sensoriels",
+                startingSpoons: 8
+            }
+        };
 
-// Classes sociales
-const socialClasses = {
-privilegie: {
-name: “Famille Aisée”,
-description: “Accès rapide aux soins, ressources abondantes”,
-startingCards: [‘evaluation_privee’, ‘therapie’, ‘amenagements’, ‘pause_cafe’]
-},
-moyenne: {
-name: “Famille Moyenne”,
-description: “Quelques ressources, attentes importantes”,
-startingCards: [‘liste_attente’, ‘recherche_google’, ‘routine_matinale’, ‘pause_cafe’]
-},
-precaire: {
-name: “Situation Précaire”,
-description: “Ressources limitées, système D obligatoire”,
-startingCards: [‘minimiser’, ‘travailler_malade’, ‘systeme_d’, ‘respiration’]
-}
-};
+        // Classes sociales
+        const socialClasses = {
+            privilegie: {
+                name: "Famille Aisée",
+                description: "Accès rapide aux soins, ressources abondantes",
+                startingCards: ['evaluation_privee', 'therapie', 'amenagements', 'pause_cafe']
+            },
+            moyenne: {
+                name: "Famille Moyenne",
+                description: "Quelques ressources, attentes importantes",
+                startingCards: ['liste_attente', 'recherche_google', 'routine_matinale', 'pause_cafe']
+            },
+            precaire: {
+                name: "Situation Précaire",
+                description: "Ressources limitées, système D obligatoire",
+                startingCards: ['minimiser', 'travailler_malade', 'systeme_d', 'respiration']
+            }
+        };
 
-// Cartes disponibles
-const allCards = {
-// Cartes privilégiées
-evaluation_privee: {
-name: “Évaluation Privée”,
-cost: 2,
-effect: “Débloque des stratégies médicales (+5 ressources)”,
-type: “action”
-},
-therapie: {
-name: “Séance de Thérapie”,
-cost: 3,
-effect: “Restaure 2 cuillères, +3 ressources neurales”,
-type: “soin”
-},
-amenagements: {
-name: “Aménagements Workplace”,
-cost: 1,
-effect: “Réduit le coût des situations professionnelles”,
-type: “buff”
-},
+        // Cartes
+        const allCards = {
+            evaluation_privee: { name: "Évaluation Privée", cost: 2, effect: "Débloque des stratégies médicales (+5 ressources)", type: "action", reward: 5 },
+            therapie: { name: "Séance de Thérapie", cost: 3, effect: "Restaure 2 cuillères, +3 ressources", type: "soin", restore: 2, reward: 3 },
+            amenagements: { name: "Aménagements Workplace", cost: 1, effect: "Réduit le coût des situations professionnelles", type: "buff" },
+            liste_attente: { name: "Liste d'Attente", cost: 0, effect: "Patience... Un jour. +1 ressource", type: "action", reward: 1 },
+            recherche_google: { name: "Recherche Google 3h", cost: 4, effect: "Informations fragmentées (+2 ressources)", type: "action", reward: 2 },
+            routine_matinale: { name: "Routine Matinale", cost: 1, effect: "Réduit le coût de la prochaine action", type: "buff" },
+            minimiser: { name: "Minimiser les Symptômes", cost: 2, effect: "Masque la réalité. Perd 1 cuillère plus tard", type: "action" },
+            travailler_malade: { name: "Travailler Malade", cost: 5, effect: "Survie économique au prix de ta santé", type: "action" },
+            systeme_d: { name: "Système D", cost: 1, effect: "Improvisation créative (+1 ressource)", type: "action", reward: 1 },
+            pause_cafe: { name: "Pause Café", cost: 1, effect: "Restaure 1 cuillère", type: "soin", restore: 1 },
+            respiration: { name: "Exercice de Respiration", cost: 0, effect: "Calme momentané. Restaure 1 cuillère", type: "soin", restore: 1 },
+            dire_non: { name: "Dire Non", cost: 2, effect: "Préserve 3 cuillères en refusant", type: "defense" },
+            ecouteurs: { name: "Écouteurs Anti-Bruit", cost: 0, effect: "Réduit le coût des situations bruyantes", type: "buff" }
+        };
 
-```
-// Cartes moyennes
-liste_attente: {
-  name: "Liste d'Attente",
-  cost: 0,
-  effect: "Patience... Un jour. +1 ressource neurale",
-  type: "action"
-},
-recherche_google: {
-  name: "Recherche Google 3h",
-  cost: 4,
-  effect: "Informations fragmentées (+2 ressources)",
-  type: "action"
-},
-routine_matinale: {
-  name: "Routine Matinale",
-  cost: 1,
-  effect: "Réduit le coût de la prochaine action de 1",
-  type: "buff"
-},
+        // Situations
+        const situations = [
+            {
+                title: "Réveil Matinal",
+                description: "Ton alarme sonne. Une nouvelle journée commence.",
+                icon: "☕",
+                choices: [
+                    { text: "Routine habituelle", cost: 2, reward: 1 },
+                    { text: "Snooze 5 fois", cost: 1, reward: 0 }
+                ]
+            },
+            {
+                title: "Transport en Commun",
+                description: "Le métro est bondé et bruyant.",
+                icon: "🚇",
+                choices: [
+                    { text: "Endurer le trajet", cost: 3, reward: 1 },
+                    { text: "Utiliser écouteurs", cost: 1, reward: 2, requiresCard: "ecouteurs" }
+                ]
+            },
+            {
+                title: "Réunion de Travail",
+                description: "Réunion improvisée de 2h dans une salle sans fenêtres.",
+                icon: "💼",
+                choices: [
+                    { text: "Participer activement", cost: 5, reward: 3 },
+                    { text: "Mode survie minimal", cost: 3, reward: 1 }
+                ]
+            },
+            {
+                title: "Interaction Sociale",
+                description: "Collègue insiste pour discuter de ta vie personnelle.",
+                icon: "👥",
+                choices: [
+                    { text: "Masquer et socialiser", cost: 4, reward: 1 },
+                    { text: "Excuses polies", cost: 1, reward: 1, requiresCard: "dire_non" }
+                ]
+            },
+            {
+                title: "Épicerie Bondée",
+                description: "Tu dois faire les courses. C'est samedi après-midi.",
+                icon: "🛒",
+                choices: [
+                    { text: "Affronter la foule", cost: 4, reward: 2 },
+                    { text: "Liste rapide et fuite", cost: 2, reward: 1 }
+                ]
+            }
+        ];
 
-// Cartes précaires
-minimiser: {
-  name: "Minimiser les Symptômes",
-  cost: 2,
-  effect: "Masque la réalité. Perd 1 cuillère supplémentaire plus tard",
-  type: "action"
-},
-travailler_malade: {
-  name: "Travailler Malade",
-  cost: 5,
-  effect: "Survie économique au prix de ta santé",
-  type: "action"
-},
-systeme_d: {
-  name: "Système D",
-  cost: 1,
-  effect: "Improvisation créative (+1 ressource)",
-  type: "action"
-},
+        // Fonctions du jeu
+        function startGame(profileKey, classKey) {
+            const profile = profiles[profileKey];
+            const socialClass = socialClasses[classKey];
+            
+            gameState.profile = profile;
+            gameState.socialClass = socialClass;
+            gameState.spoons = profile.startingSpoons;
+            gameState.maxSpoons = profile.startingSpoons;
+            
+            gameState.deck = socialClass.startingCards.map(cardId => ({
+                id: cardId,
+                ...allCards[cardId]
+            }));
+            
+            drawHand();
+            gameState.phase = 'day';
+            nextSituation();
+            render();
+        }
 
-// Cartes communes
-pause_cafe: {
-  name: "Pause Café",
-  cost: 1,
-  effect: "Restaure 1 cuillère",
-  type: "soin"
-},
-respiration: {
-  name: "Exercice de Respiration",
-  cost: 0,
-  effect: "Calme momentané. Restaure 1 cuillère",
-  type: "soin"
-},
-dire_non: {
-  name: "Dire Non",
-  cost: 2,
-  effect: "Préserve 3 cuillères en refusant",
-  type: "defense"
-},
-ecouteurs: {
-  name: "Écouteurs Anti-Bruit",
-  cost: 0,
-  effect: "Réduit le coût des situations bruyantes",
-  type: "buff"
-}
-```
+        function drawHand() {
+            const shuffled = [...gameState.deck].sort(() => Math.random() - 0.5);
+            gameState.hand = shuffled.slice(0, 4);
+        }
 
-};
+        function nextSituation() {
+            if (gameState.situationIndex < situations.length) {
+                gameState.currentSituation = situations[gameState.situationIndex];
+                gameState.situationIndex++;
+            } else {
+                gameState.phase = 'rest';
+                gameState.message = 'Journée terminée. Phase de repos.';
+            }
+        }
 
-// Situations
-const situations = [
-{
-title: “Réveil Matinal”,
-description: “Ton alarme sonne. Une nouvelle journée commence.”,
-icon: Coffee,
-choices: [
-{ text: “Routine habituelle”, cost: 2, reward: 1 },
-{ text: “Snooze 5 fois”, cost: 1, penalty: “Stress matinal” }
-]
-},
-{
-title: “Transport en Commun”,
-description: “Le métro est bondé et bruyant.”,
-icon: Users,
-choices: [
-{ text: “Endurer le trajet”, cost: 3, reward: 1 },
-{ text: “Utiliser écouteurs”, cost: 1, reward: 2, requiresCard: “ecouteurs” }
-]
-},
-{
-title: “Réunion de Travail”,
-description: “Réunion improvisée de 2h dans une salle sans fenêtres.”,
-icon: Briefcase,
-choices: [
-{ text: “Participer activement”, cost: 5, reward: 3 },
-{ text: “Mode survie minimal”, cost: 3, reward: 1 }
-]
-},
-{
-title: “Interaction Sociale Forcée”,
-description: “Collègue insiste pour discuter de ta vie personnelle.”,
-icon: Users,
-choices: [
-{ text: “Masquer et socialiser”, cost: 4, reward: 1 },
-{ text: “Excuses polies”, cost: 1, reward: 1, requiresCard: “dire_non” }
-]
-},
-{
-title: “Épicerie Bondée”,
-description: “Tu dois faire les courses. C’est samedi après-midi.”,
-icon: Users,
-choices: [
-{ text: “Affronter la foule”, cost: 4, reward: 2 },
-{ text: “Liste rapide et fuite”, cost: 2, reward: 1 }
-]
-}
-];
+        function handleChoice(choice) {
+            if (choice.requiresCard && !gameState.hand.find(c => c.id === choice.requiresCard)) {
+                gameState.message = `Vous avez besoin de la carte "${allCards[choice.requiresCard].name}"`;
+                render();
+                return;
+            }
 
-// Initialisation
-const startGame = (selectedProfile, selectedClass) => {
-setProfile(profiles[selectedProfile]);
-setSocialClass(socialClasses[selectedClass]);
+            if (gameState.spoons < choice.cost) {
+                gameState.message = 'Pas assez de cuillères! Burnout...';
+                gameState.spoons = 0;
+                render();
+                setTimeout(() => {
+                    gameState.phase = 'gameOver';
+                    render();
+                }, 1500);
+                return;
+            }
 
-```
-const startSpoons = profiles[selectedProfile].startingSpoons;
-setSpoons(startSpoons);
-setMaxSpoons(startSpoons);
+            gameState.spoons = Math.max(0, gameState.spoons - choice.cost);
+            gameState.neuralResources += (choice.reward || 0);
+            gameState.message = `-${choice.cost} cuillères, +${choice.reward || 0} ressources`;
+            
+            render();
+            setTimeout(() => {
+                gameState.message = '';
+                nextSituation();
+                render();
+            }, 1000);
+        }
 
-// Créer le deck initial
-const initialDeck = socialClasses[selectedClass].startingCards.map(cardId => ({
-  id: cardId,
-  ...allCards[cardId]
-}));
+        function playCard(card) {
+            if (gameState.spoons < card.cost) {
+                gameState.message = 'Pas assez de cuillères pour cette carte';
+                render();
+                return;
+            }
 
-setDeck(initialDeck);
-drawHand(initialDeck);
-setGamePhase('day');
-nextSituation();
-```
+            gameState.spoons = Math.max(0, gameState.spoons - card.cost);
+            
+            if (card.restore) {
+                gameState.spoons = Math.min(gameState.maxSpoons, gameState.spoons + card.restore);
+                gameState.message = `${card.name}: restauré ${card.restore} cuillère(s)`;
+            } else {
+                gameState.message = `${card.name} joué: ${card.effect}`;
+            }
+            
+            if (card.reward) {
+                gameState.neuralResources += card.reward;
+            }
 
-};
+            gameState.hand = gameState.hand.filter(c => c.id !== card.id);
+            
+            render();
+            setTimeout(() => {
+                gameState.message = '';
+                render();
+            }, 2000);
+        }
 
-// Piocher une main
-const drawHand = (currentDeck) => {
-const shuffled = […currentDeck].sort(() => Math.random() - 0.5);
-setHand(shuffled.slice(0, 4));
-};
+        function restPhase() {
+            const restoredSpoons = Math.floor(gameState.maxSpoons * 0.7);
+            gameState.spoons = restoredSpoons;
+            gameState.day++;
+            gameState.situationIndex = 0;
+            drawHand();
+            gameState.phase = 'day';
+            gameState.message = `Jour ${gameState.day}: ${restoredSpoons} cuillères restaurées`;
+            render();
+            setTimeout(() => {
+                gameState.message = '';
+                nextSituation();
+                render();
+            }, 2000);
+        }
 
-// Prochaine situation
-const nextSituation = () => {
-if (situationIndex < 5) {
-setCurrentSituation(situations[situationIndex]);
-setSituationIndex(situationIndex + 1);
-} else {
-// Fin de journée
-setGamePhase(‘rest’);
-setMessage(‘Journée terminée. Phase de repos.’);
-}
-};
+        function upgradeSpoons() {
+            if (gameState.neuralResources >= 3) {
+                gameState.neuralResources -= 3;
+                gameState.maxSpoons++;
+                gameState.message = 'Cuillères maximales augmentées!';
+                render();
+                setTimeout(() => {
+                    gameState.message = '';
+                    render();
+                }, 2000);
+            }
+        }
 
-// Gérer un choix de situation
-const handleChoice = (choice) => {
-if (choice.requiresCard && !hand.find(c => c.id === choice.requiresCard)) {
-setMessage(`Vous avez besoin de la carte "${allCards[choice.requiresCard].name}"`);
-return;
-}
+        // Rendu de l'interface
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (gameState.phase === 'intro') {
+                app.innerHTML = renderIntro();
+            } else if (gameState.phase === 'day') {
+                app.innerHTML = renderDay();
+            } else if (gameState.phase === 'rest') {
+                app.innerHTML = renderRest();
+            } else if (gameState.phase === 'gameOver') {
+                app.innerHTML = renderGameOver();
+            }
+        }
 
-```
-if (spoons < choice.cost) {
-  setMessage('Pas assez de cuillères! Burnout imminent...');
-  setSpoons(0);
-  setTimeout(() => setGamePhase('gameOver'), 1500);
-  return;
-}
+        function renderIntro() {
+            return `
+                <div class="max-w-4xl mx-auto p-8">
+                    <h1 class="text-5xl font-bold text-indigo-900 mb-4 text-center fade-in">
+                        Spoon Theory
+                    </h1>
+                    <p class="text-xl text-indigo-700 mb-8 text-center italic">
+                        Votre cerveau est différent. Le monde devrait l'être aussi.
+                    </p>
 
-setSpoons(Math.max(0, spoons - choice.cost));
-setNeuralResources(neuralResources + (choice.reward || 0));
-setMessage(`-${choice.cost} cuillères, +${choice.reward || 0} ressources`);
+                    <div class="bg-white rounded-lg shadow-lg p-6 mb-6 fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Choisissez votre profil</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${Object.entries(profiles).map(([key, prof]) => `
+                                <button onclick="selectProfile('${key}')" 
+                                    class="p-4 rounded-lg border-2 border-gray-300 hover:border-indigo-600 hover:bg-indigo-50 transition-all card-hover">
+                                    <h3 class="font-bold text-lg mb-2">${prof.name}</h3>
+                                    <p class="text-sm text-gray-600">${prof.description}</p>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
 
-setTimeout(() => {
-  setMessage('');
-  nextSituation();
-}, 1000);
-```
+                    <div class="bg-white rounded-lg shadow-lg p-6 mb-6 fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Choisissez votre contexte social</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${Object.entries(socialClasses).map(([key, sClass]) => `
+                                <button onclick="selectClass('${key}')" 
+                                    class="p-4 rounded-lg border-2 border-gray-300 hover:border-purple-600 hover:bg-purple-50 transition-all card-hover">
+                                    <h3 class="font-bold text-lg mb-2">${sClass.name}</h3>
+                                    <p class="text-sm text-gray-600">${sClass.description}</p>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
 
-};
-
-// Utiliser une carte
-const playCard = (card) => {
-if (spoons < card.cost) {
-setMessage(‘Pas assez de cuillères pour cette carte’);
-return;
-}
-
-```
-setSpoons(Math.max(0, spoons - card.cost));
-
-// Effets selon le type
-if (card.type === 'soin') {
-  const restore = card.name.includes('Thérapie') ? 2 : 1;
-  setSpoons(Math.min(maxSpoons, spoons - card.cost + restore));
-  setMessage(`${card.name}: restauré ${restore} cuillère(s)`);
-} else {
-  setMessage(`${card.name} joué: ${card.effect}`);
-}
-
-if (card.effect.includes('ressources') || card.effect.includes('ressource')) {
-  const match = card.effect.match(/\+(\d+)/);
-  if (match) setNeuralResources(neuralResources + parseInt(match[1]));
-}
-
-// Retirer de la main
-setHand(hand.filter(c => c.id !== card.id));
-
-setTimeout(() => setMessage(''), 2000);
-```
-
-};
-
-// Phase de repos
-const restPhase = () => {
-const restoredSpoons = Math.floor(maxSpoons * 0.7);
-setSpoons(restoredSpoons);
-setDay(day + 1);
-setSituationIndex(0);
-drawHand(deck);
-setGamePhase(‘day’);
-setMessage(`Jour ${day + 1}: ${restoredSpoons} cuillères restaurées`);
-setTimeout(() => {
-setMessage(’’);
-nextSituation();
-}, 2000);
-};
-
-// Améliorer une carte
-const upgradeCard = (cardId) => {
-if (neuralResources < 5) {
-setMessage(‘Pas assez de ressources neurales (besoin: 5)’);
-return;
-}
-
-```
-setNeuralResources(neuralResources - 5);
-setMessage('Carte améliorée! (Fonctionnalité à venir)');
-setTimeout(() => setMessage(''), 2000);
-```
-
-};
-
-// Écran d’intro
-if (gamePhase === ‘intro’) {
-return (
-<div className="w-full h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-8 overflow-auto">
-<div className="max-w-4xl mx-auto">
-<h1 className="text-5xl font-bold text-indigo-900 mb-4 text-center">
-Spoon Theory
-</h1>
-<p className="text-xl text-indigo-700 mb-8 text-center italic">
-Votre cerveau est différent. Le monde devrait l’être aussi.
-</p>
-
-```
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Choisissez votre profil</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(profiles).map(([key, prof]) => (
-            <button
-              key={key}
-              onClick={() => setProfile(key)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                profile === key
-                  ? 'border-indigo-600 bg-indigo-50'
-                  : 'border-gray-300 hover:border-indigo-400'
-              }`}
-            >
-              <h3 className="font-bold text-lg mb-2">{prof.name}</h3>
-              <p className="text-sm text-gray-600 mb-2">{prof.description}</p>
-              <p className="text-xs text-gray-500">{prof.specialMechanic}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Choisissez votre contexte social</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(socialClasses).map(([key, sClass]) => (
-            <button
-              key={key}
-              onClick={() => setSocialClass(key)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                socialClass === key
-                  ? 'border-purple-600 bg-purple-50'
-                  : 'border-gray-300 hover:border-purple-400'
-              }`}
-            >
-              <h3 className="font-bold text-lg mb-2">{sClass.name}</h3>
-              <p className="text-sm text-gray-600">{sClass.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {profile && socialClass && (
-        <div className="text-center">
-          <button
-            onClick={() => startGame(profile, socialClass)}
-            className="bg-indigo-600 text-white px-8 py-4 rounded-lg text-xl font-bold hover:bg-indigo-700 transition-colors"
-          >
-            Commencer la Journée
-          </button>
-        </div>
-      )}
-    </div>
-  </div>
-);
-```
-
-}
-
-// Phase de jeu
-if (gamePhase === ‘day’) {
-return (
-<div className="w-full min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-<div className="max-w-6xl mx-auto">
-{/* Header */}
-<div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-<div className="flex justify-between items-center mb-4">
-<div>
-<h2 className="text-2xl font-bold text-gray-800">Jour {day}</h2>
-<p className="text-sm text-gray-600">{profile?.name} - {socialClass?.name}</p>
-</div>
-<div className="flex gap-6">
-<div className="text-center">
-<Coffee className="mx-auto mb-1 text-amber-600" size={24} />
-<div className="text-2xl font-bold text-amber-600">{spoons}</div>
-<div className="text-xs text-gray-600">Cuillères</div>
-</div>
-<div className="text-center">
-<Zap className="mx-auto mb-1 text-purple-600" size={24} />
-<div className="text-2xl font-bold text-purple-600">{neuralResources}</div>
-<div className="text-xs text-gray-600">Ressources</div>
-</div>
-</div>
-</div>
-
-```
-        {/* Barre de cuillères */}
-        <div className="w-full bg-gray-200 rounded-full h-4">
-          <div
-            className="bg-gradient-to-r from-amber-400 to-amber-600 h-4 rounded-full transition-all"
-            style={{ width: `${(spoons / maxSpoons) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      {message && (
-        <div className="bg-blue-100 border-l-4 border-blue-600 p-4 mb-4 rounded">
-          <p className="text-blue-800 font-medium">{message}</p>
-        </div>
-      )}
-
-      {/* Situation actuelle */}
-      {currentSituation && (
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
-          <div className="flex items-center gap-4 mb-4">
-            <currentSituation.icon size={48} className="text-indigo-600" />
-            <div>
-              <h3 className="text-2xl font-bold text-gray-800">{currentSituation.title}</h3>
-              <p className="text-gray-600">{currentSituation.description}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentSituation.choices.map((choice, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleChoice(choice)}
-                className="p-4 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-300 rounded-lg transition-all text-left"
-              >
-                <div className="font-bold text-lg mb-2">{choice.text}</div>
-                <div className="text-sm text-gray-600">
-                  Coût: {choice.cost} cuillères | Gain: {choice.reward || 0} ressources
+                    <div class="text-center" id="startButton"></div>
                 </div>
-                {choice.requiresCard && (
-                  <div className="text-xs text-purple-600 mt-1">
-                    Nécessite: {allCards[choice.requiresCard].name}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+            `;
+        }
 
-      {/* Main de cartes */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Vos Cartes</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {hand.map((card, idx) => (
-            <button
-              key={idx}
-              onClick={() => playCard(card)}
-              className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg hover:shadow-lg transition-all"
-            >
-              <div className="font-bold text-sm mb-2">{card.name}</div>
-              <div className="text-xs text-gray-600 mb-2">{card.effect}</div>
-              <div className="text-xs font-bold text-purple-600">
-                {card.cost} cuillères
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-```
+        function renderDay() {
+            const situation = gameState.currentSituation;
+            return `
+                <div class="max-w-6xl mx-auto p-4">
+                    <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800">Jour ${gameState.day}</h2>
+                                <p class="text-sm text-gray-600">${gameState.profile.name} - ${gameState.socialClass.name}</p>
+                            </div>
+                            <div class="flex gap-6">
+                                <div class="text-center">
+                                    <div class="text-3xl mb-1">☕</div>
+                                    <div class="text-2xl font-bold text-amber-600">${gameState.spoons}</div>
+                                    <div class="text-xs text-gray-600">Cuillères</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-3xl mb-1">⚡</div>
+                                    <div class="text-2xl font-bold text-purple-600">${gameState.neuralResources}</div>
+                                    <div class="text-xs text-gray-600">Ressources</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="w-full bg-gray-200 rounded-full h-4">
+                            <div class="bg-gradient-to-r from-amber-400 to-amber-600 h-4 rounded-full transition-all"
+                                style="width: ${(gameState.spoons / gameState.maxSpoons) * 100}%"></div>
+                        </div>
+                    </div>
 
-}
+                    ${gameState.message ? `
+                        <div class="bg-blue-100 border-l-4 border-blue-600 p-4 mb-4 rounded fade-in">
+                            <p class="text-blue-800 font-medium">${gameState.message}</p>
+                        </div>
+                    ` : ''}
 
-// Phase de repos
-if (gamePhase === ‘rest’) {
-return (
-<div className="w-full h-screen bg-gradient-to-br from-indigo-900 to-purple-900 p-8 flex items-center justify-center">
-<div className="max-w-2xl bg-white rounded-lg shadow-2xl p-8">
-<Home size={64} className="mx-auto mb-4 text-indigo-600" />
-<h2 className="text-3xl font-bold text-center mb-4">Phase de Repos</h2>
-<p className="text-center text-gray-600 mb-6">
-La journée est terminée. Prenez soin de vous pour demain.
-</p>
+                    ${situation ? `
+                        <div class="bg-white rounded-lg shadow-lg p-6 mb-4 fade-in">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="text-5xl">${situation.icon}</div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-gray-800">${situation.title}</h3>
+                                    <p class="text-gray-600">${situation.description}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${situation.choices.map((choice, idx) => `
+                                    <button onclick="handleChoice(${idx})" 
+                                        class="p-4 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-300 rounded-lg transition-all text-left card-hover">
+                                        <div class="font-bold text-lg mb-2">${choice.text}</div>
+                                        <div class="text-sm text-gray-600">
+                                            Coût: ${choice.cost} cuillères | Gain: ${choice.reward || 0} ressources
+                                        </div>
+                                        ${choice.requiresCard ? `
+                                            <div class="text-xs text-purple-600 mt-1">
+                                                Nécessite: ${allCards[choice.requiresCard].name}
+                                            </div>
+                                        ` : ''}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
 
-```
-      <div className="bg-indigo-50 rounded-lg p-6 mb-6">
-        <h3 className="text-xl font-bold mb-4">Ressources Neurales: {neuralResources}</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Utilisez vos ressources pour améliorer vos cartes ou développer de nouvelles stratégies.
-        </p>
-        
-        <div className="space-y-2">
-          <button
-            onClick={() => upgradeCard('pause_cafe')}
-            className="w-full p-3 bg-purple-100 hover:bg-purple-200 rounded-lg text-left transition-colors"
-          >
-            <div className="font-bold">Améliorer une carte</div>
-            <div className="text-sm text-gray-600">Coût: 5 ressources</div>
-          </button>
-          
-          <button
-            onClick={() => {
-              if (neuralResources >= 3) {
-                setNeuralResources(neuralResources - 3);
-                setMaxSpoons(maxSpoons + 1);
-                setMessage('Cuillères maximales augmentées!');
-              }
-            }}
-            className="w-full p-3 bg-amber-100 hover:bg-amber-200 rounded-lg text-left transition-colors"
-          >
-            <div className="font-bold">Améliorer le sommeil</div>
-            <div className="text-sm text-gray-600">+1 cuillère max | Coût: 3 ressources</div>
-          </button>
-        </div>
-      </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Vos Cartes</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            ${gameState.hand.map((card, idx) => `
+                                <button onclick="playCard(${idx})" 
+                                    class="p-4 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg hover:shadow-lg transition-all card-hover">
+                                    <div class="font-bold text-sm mb-2">${card.name}</div>
+                                    <div class="text-xs text-gray-600 mb-2">${card.effect}</div>
+                                    <div class="text-xs font-bold text-purple-600">${card.cost} cuillères</div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-      {message && (
-        <div className="bg-green-100 border-l-4 border-green-600 p-4 mb-4 rounded">
-          <p className="text-green-800">{message}</p>
-        </div>
-      )}
+        function renderRest() {
+            return `
+                <div class="min-h-screen bg-gradient-to-br from-indigo-900 to-purple-900 p-8 flex items-center justify-center">
+                    <div class="max-w-2xl bg-white rounded-lg shadow-2xl p-8 fade-in">
+                        <div class="text-6xl text-center mb-4">🏠</div>
+                        <h2 class="text-3xl font-bold text-center mb-4">Phase de Repos</h2>
+                        <p class="text-center text-gray-600 mb-6">
+                            La journée est terminée. Prenez soin de vous pour demain.
+                        </p>
+                        
+                        <div class="bg-indigo-50 rounded-lg p-6 mb-6">
+                            <h3 class="text-xl font-bold mb-4">Ressources Neurales: ${gameState.neuralResources}</h3>
+                            <p class="text-sm text-gray-600 mb-4">
+                                Utilisez vos ressources pour améliorer vos capacités.
+                            </p>
+                            
+                            <div class="space-y-2">
+                                <button onclick="upgradeSpoons()" 
+                                    class="w-full p-3 bg-amber-100 hover:bg-amber-200 rounded-lg text-left transition-colors">
+                                    <div class="font-bold">Améliorer le sommeil</div>
+                                    <div class="text-sm text-gray-600">+1 cuillère max | Coût: 3 ressources</div>
+                                </button>
+                            </div>
+                        </div>
 
-      <button
-        onClick={restPhase}
-        className="w-full bg-indigo-600 text-white py-4 rounded-lg text-xl font-bold hover:bg-indigo-700 transition-colors"
-      >
-        Jour Suivant
-      </button>
-    </div>
-  </div>
-);
-```
+                        ${gameState.message ? `
+                            <div class="bg-green-100 border-l-4 border-green-600 p-4 mb-4 rounded">
+                                <p class="text-green-800">${gameState.message}</p>
+                            </div>
+                        ` : ''}
 
-}
+                        <button onclick="restPhase()" 
+                            class="w-full bg-indigo-600 text-white py-4 rounded-lg text-xl font-bold hover:bg-indigo-700 transition-colors">
+                            Jour Suivant
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
-// Game Over
-if (gamePhase === ‘gameOver’) {
-return (
-<div className="w-full h-screen bg-gradient-to-br from-red-900 to-orange-900 p-8 flex items-center justify-center">
-<div className="max-w-2xl bg-white rounded-lg shadow-2xl p-8 text-center">
-<AlertCircle size={64} className="mx-auto mb-4 text-red-600" />
-<h2 className="text-3xl font-bold mb-4">Burnout</h2>
-<p className="text-gray-600 mb-6">
-Vous avez épuisé toutes vos cuillères. C’est la réalité quotidienne pour beaucoup de personnes neurodivergentes.
-</p>
-<div className="bg-gray-100 rounded-lg p-4 mb-6">
-<p className="text-sm text-gray-700">
-Jours survécus: <span className="font-bold">{day}</span>
-</p>
-<p className="text-sm text-gray-700">
-Ressources accumulées: <span className="font-bold">{neuralResources}</span>
-</p>
-</div>
-<button
-onClick={() => window.location.reload()}
-className=“bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors”
->
-Recommencer
-</button>
-</div>
-</div>
-);
-}
-};
+        function renderGameOver() {
+            return `
+                <div class="min-h-screen bg-gradient-to-br from-red-900 to-orange-900 p-8 flex items-center justify-center">
+                    <div class="max-w-2xl bg-white rounded-lg shadow-2xl p-8 text-center fade-in">
+                        <div class="text-6xl mb-4">⚠️</div>
+                        <h2 class="text-3xl font-bold mb-4">Burnout</h2>
+                        <p class="text-gray-600 mb-6">
+                            Vous avez épuisé toutes vos cuillères. C'est la réalité quotidienne pour beaucoup de personnes neurodivergentes.
+                        </p>
+                        <div class="bg-gray-100 rounded-lg p-4 mb-6">
+                            <p class="text-sm text-gray-700 mb-2">
+                                Jours survécus: <span class="font-bold">${gameState.day}</span>
+                            </p>
+                            <p class="text-sm text-gray-700">
+                                Ressources accumulées: <span class="font-bold">${gameState.neuralResources}</span>
+                            </p>
+                        </div>
+                        <button onclick="location.reload()" 
+                            class="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors">
+                            Recommencer
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
-export default SpoonTheoryGame;
+        // Variables temporaires pour la sélection
+        let selectedProfile = null;
+        let selectedClass = null;
+
+        function selectProfile(key) {
+            selectedProfile = key;
+            updateStartButton();
+        }
+
+        function selectClass(key) {
+            selectedClass = key;
+            updateStartButton();
+        }
+
+        function updateStartButton() {
+            const button = document.getElementById('startButton');
+            if (selectedProfile && selectedClass && button) {
+                button.innerHTML = `
+                    <button onclick="startGame('${selectedProfile}', '${selectedClass}')" 
+                        class="bg-indigo-600 text-white px-8 py-4 rounded-lg text-xl font-bold hover:bg-indigo-700 transition-colors">
+                        Commencer la Journée
+                    </button>
+                `;
+            }
+        }
+
+        // Wrapper pour les événements onclick
+        window.selectProfile = selectProfile;
+        window.selectClass = selectClass;
+        window.startGame = startGame;
+        window.handleChoice = (idx) => handleChoice(gameState.currentSituation.choices[idx]);
+        window.playCard = (idx) => playCard(gameState.hand[idx]);
+        window.restPhase = restPhase;
+        window.upgradeSpoons = upgradeSpoons;
+
+        // Initialisation
+        render();
+    </script>
+</body>
+</html>
